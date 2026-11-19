@@ -3,6 +3,7 @@
 <title>Mini Video Maker</title>
 <style>
 :root{--bg:#0e0e0f;--card:#19191b;--line:#303034;--tx:#f4f4f5;--mut:#9b9ba3;--y:#f5b800}
+[hidden]{display:none!important}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 system-ui,sans-serif}
 .w{max-width:940px;margin:0 auto;padding:20px}
 h1{font-size:24px;margin:0 0 2px;color:var(--y)}p.m{color:var(--mut);margin:0 0 6px}
@@ -58,9 +59,13 @@ try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catc
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
 
+async function F(url,opt,name){
+ try{return await fetch(url,opt)}
+ catch(e){throw new Error(`Không kết nối được ${name} (${e.message}). Kiểm tra mạng/VPN, tắt AdBlock hoặc kiểm tra lại API key.`)}
+}
 async function gem(model,body){
  for(let i=0;i<3;i++){
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${$('gk').value.trim()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const r=await F(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${$('gk').value.trim()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},'Gemini');
   if(r.status==429||r.status==503){log(`Gemini đang giới hạn tốc độ, chờ ${8*(i+1)}s rồi thử lại...`);await sleep(8000*(i+1));continue}
   const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);return j;
  }
@@ -90,7 +95,7 @@ Chỉ trả JSON: {"title":"...","scenes":[{"narration":"...","keyword":"..."}]}
 };
 
 async function pick(kw){
- const r=await fetch(`https://pixabay.com/api/videos/?key=${$('pk').value.trim()}&q=${encodeURIComponent(kw)}&per_page=10&safesearch=true`);
+ const r=await F(`https://pixabay.com/api/videos/?key=${$('pk').value.trim()}&q=${encodeURIComponent(kw)}&per_page=10&safesearch=true`,{},'Pixabay');
  if(!r.ok)throw new Error('Pixabay lỗi '+r.status+' (kiểm tra API key)');
  const j=await r.json();if(!j.hits.length)return null;
  const h=j.hits[Math.floor(Math.random()*Math.min(5,j.hits.length))];
