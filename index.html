@@ -28,7 +28,8 @@ details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;fo
 <div class="g">
 <div><label>Gemini API key</label><input id="gk" type="password" autocomplete="off"></div>
 <div><label>Pixabay API key</label><input id="pk" type="password" autocomplete="off"></div>
-<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="unsplash">Ảnh Unsplash (ảnh đẹp, chạy hiệu ứng zoom)</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option><option value="plain">Nền màu + phụ đề (không cần hình, để thử nhanh)</option></select></div>
+<div><label>Coverr API key (coverr.co/developers)</label><input id="ck" type="password" autocomplete="off"></div>
+<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="combo">Ưu tiên Pixabay + Coverr (khuyên dùng)</option><option value="pixabay">Chỉ Pixabay</option><option value="coverr">Chỉ Coverr</option><option value="pexels">Video Pexels</option><option value="unsplash">Ảnh Unsplash (ảnh đẹp, chạy hiệu ứng zoom)</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option><option value="plain">Nền màu + phụ đề (không cần hình, để thử nhanh)</option></select></div>
 <div id="lf" hidden><label>Chọn video hoặc ảnh từ máy (chọn nhiều file, gán lần lượt cho các cảnh)</label><input id="lfi" type="file" multiple accept="video/*,image/*"></div>
 <div><label>OpenAI API key (platform.openai.com)</label><input id="ok" type="password" autocomplete="off"></div>
 <div><label>Model ảnh OpenAI</label><input id="om" value="gpt-image-2"></div>
@@ -68,7 +69,7 @@ details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;fo
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg','uk'];
+const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg','uk','ck'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
@@ -82,7 +83,7 @@ async function gem(model,body){
  let last='';
  for(let i=0;i<3;i++){
   const r=await F(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${$('gk').value.trim()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},'Gemini');
-  if(r.status==429||r.status==503){const em=(await r.json().catch(()=>({}))).error?.message||'';last=em;if(/limit: 0/i.test(em))throw new Error('Gemini không còn hạn mức miễn phí cho model "'+model+'": '+em.slice(0,150));log(`Gemini đang giới hạn tốc độ, chờ ${8*(i+1)}s rồi thử lại...`);await sleep(8000*(i+1));continue}
+  if(r.status==429||r.status==503||r.status==500){const em=(await r.json().catch(()=>({}))).error?.message||'';last=em;const mm=em.match(/retry in ([\d.]+)s/i),wt=mm?Math.min(45,Math.ceil(+mm[1])+2)*1000:8000*(i+1);if(/limit: 0/i.test(em))throw new Error('Gemini không còn hạn mức miễn phí cho model "'+model+'": '+em.slice(0,150));log(`Gemini đang giới hạn tốc độ/quá tải, chờ ${Math.round(wt/1000)}s rồi thử lại...`);await sleep(wt);continue}
   const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);return j;
  }
  throw new Error('Gemini quá tải hoặc hết quota: '+last.slice(0,150));
@@ -165,13 +166,13 @@ async function pick(kw){
  if(r.status==429)throw new Error('Pixabay đang giới hạn lượt gọi (rate limit). Chờ vài phút hoặc đổi nguồn hình ở phần Khóa API.');
  if(!r.ok)throw new Error('Pixabay lỗi '+r.status+' (kiểm tra API key)');
  const j=await r.json();if(!j.hits.length)return null;
- const h=j.hits[Math.floor(Math.random()*Math.min(5,j.hits.length))];
- return(h.videos.medium||h.videos.small||h.videos.tiny).url;
+ const us=j.hits.slice(0,8).map(h=>(h.videos.small||h.videos.medium||h.videos.tiny).url),i0=Math.floor(Math.random()*Math.min(5,us.length));
+ pick.alts=us.filter((_,i)=>i!=i0);return us[i0];
 }
 async function load(url){
  const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.preload='auto';
  try{v.src=URL.createObjectURL(await(await fetch(url)).blob())}catch(e){v.crossOrigin='anonymous';v.src=url}
- await new Promise((ok,no)=>{v.onloadeddata=ok;v.onerror=()=>no(new Error('Không tải được video Pixabay'))});
+ await new Promise((ok,no)=>{v.onloadeddata=ok;v.onerror=()=>no(new Error('Không tải được file video'))});
  return v;
 }
 async function pexels(kw){
@@ -233,26 +234,49 @@ async function media(s){
   return plainImg(s);
  }
  if(src=='gpt')return gptImg(s);
- const f=src=='pexels'?pexels:pick,nm=src=='pexels'?'Pexels':'Pixabay';
- try{
-  let u;for(let a=0;a<2;a++)try{u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');break}catch(e){if(a||!/Không kết nối/.test(e.message))throw e;await sleep(2000)}
-  if(!u)throw new Error('Không tìm thấy video cho: '+s.k);
-  return await load(u);
- }catch(e){
-  if(!/Không kết nối|Không tải được/.test(e.message))throw e;
-  warn('Cảnh '+(s.i+1)+': '+nm+' không kết nối được từ trình duyệt này, đang dùng nguồn dự phòng.');
-  if(src!='pexels'&&$('xk').value.trim())try{return await media2('pexels',s)}catch(x){}
-  if($('uk').value.trim())try{return await unsplashImg(s)}catch(x){}
-  warn('Không có nguồn dự phòng, cảnh '+(s.i+1)+' dùng nền màu. Xem hướng dẫn kiểm tra '+nm+'.');
-  return plainImg(s);
+ const order={combo:['pixabay','coverr'],pixabay:['pixabay'],coverr:['coverr'],pexels:['pexels']}[src]||['pixabay'];
+ const KEY={pixabay:'pk',coverr:'ck',pexels:'xk',unsplash:'uk'},NAME={pixabay:'Pixabay',coverr:'Coverr',pexels:'Pexels',unsplash:'Unsplash'};
+ const chain=[...order,...['pixabay','coverr','pexels','unsplash'].filter(p=>!order.includes(p))].filter(p=>$(KEY[p]).value.trim());
+ if(!chain.length)throw new Error('Chưa nhập API key cho nguồn hình đã chọn.');
+ for(let n=0;n<chain.length;n++){const p=chain[n];
+  try{return p=='unsplash'?await unsplashImg(s):await stockVid(p,s)}
+  catch(e){warn('Cảnh '+(s.i+1)+': '+NAME[p]+' lỗi ('+e.message.slice(0,130)+')'+(n<chain.length-1?', thử '+NAME[chain[n+1]]+'.':'.'))}
  }
+ warn('Cảnh '+(s.i+1)+' dùng nền màu vì mọi nguồn đều lỗi.');
+ return plainImg(s);
 }
-async function media2(n,s){const u=await pexels(s.k)||await pexels('technology');if(!u)throw new Error('none');return load(u)}
+async function coverr(kw){
+ const r=await F(`https://api.coverr.co/videos?query=${encodeURIComponent(kw)}&urls=true&page_size=20`,{headers:{Authorization:'Bearer '+$('ck').value.trim()}},'Coverr');
+ if(r.status==401||r.status==403)throw new Error('Coverr: API key sai hoặc hết lượt gọi');
+ if(r.status==429)throw new Error('Coverr: đang giới hạn lượt gọi, chờ một lúc');
+ if(!r.ok)throw new Error('Coverr lỗi '+r.status);
+ const j=await r.json();let h=(j.hits||[]).filter(x=>x.urls&&(x.urls.mp4||x.urls.mp4_preview));
+ const v=h.filter(x=>x.is_vertical===($('ar').value=='p'));if(v.length)h=v;
+ if(!h.length)return null;
+ const us=h.slice(0,8).map(x=>x.urls.mp4_preview&&!x.urls.mp4?x.urls.mp4_preview:x.urls.mp4),i0=Math.floor(Math.random()*Math.min(5,us.length));
+ pick.alts=us.filter((_,i)=>i!=i0);return us[i0];
+}
+async function stockVid(p,s){
+ const f={pixabay:pick,coverr,pexels}[p];pick.alts=[];await sleep(700);
+ let u;for(let a=0;a<3;a++)try{u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');break}catch(e){if(a==2||!/Không kết nối/.test(e.message))throw e;await sleep(3000*(a+1))}
+ if(!u)throw new Error('không có video cho: '+s.k);
+ try{return await load(u)}catch(e){for(const a of(pick.alts||[]).slice(0,3))try{return await load(a)}catch(x){}throw e}
+}
+const FATAL=/limit: 0|API key|permission|not found|billing|not supported/i;
 async function tts(text,ac){
- const j=await gem($('tm').value.trim(),{contents:[{parts:[{text:($('vs').value.trim()?$('vs').value.trim()+' ':'')+text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
- const bin=atob(j.candidates[0].content.parts[0].inlineData.data),n=bin.length>>1,buf=ac.createBuffer(1,n,24000),ch=buf.getChannelData(0);
- for(let i=0;i<n;i++){let v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v>32767)v-=65536;ch[i]=v/32768}
- return buf;
+ let err;
+ for(let a=0;a<4;a++){
+  try{
+   const pre=a<2&&$('vs').value.trim()?$('vs').value.trim()+' ':'';
+   const j=await gem($('tm').value.trim(),{contents:[{parts:[{text:pre+text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
+   const p=j.candidates?.[0]?.content?.parts?.find(x=>x.inlineData);
+   if(!p)throw new Error('Gemini không trả về âm thanh');
+   const bin=atob(p.inlineData.data),n=bin.length>>1,buf=ac.createBuffer(1,n,24000),ch=buf.getChannelData(0);
+   for(let i=0;i<n;i++){let v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v>32767)v-=65536;ch[i]=v/32768}
+   return buf;
+  }catch(e){err=e;if(FATAL.test(e.message))throw e;await sleep(2500*(a+1))}
+ }
+ throw err;
 }
 function wrap(c,t,mw){const L=[];let l='';for(const x of t.split(' ')){const y=l?l+' '+x:x;if(c.measureText(y).width>mw&&l){L.push(l);l=x}else l=y}L.push(l);return L}
 function cover(c,v,W,H,z=0,px=0){const w=v.videoWidth||v.naturalWidth,h=v.videoHeight||v.naturalHeight;if(!w)return;const s=Math.max(W/w,H/h)*(1+z);c.drawImage(v,(W-w*s)/2+px*W*.05,(H-h*s)/2,w*s,h*s)}
@@ -275,9 +299,10 @@ $('b2').onclick=async()=>{
    const s=S[i];log(`Cảnh ${i+1}/${S.length}: tìm video "${s.k}"...`);
    s.v=await media(s);
    if(voice){log(`Cảnh ${i+1}/${S.length}: tạo giọng đọc...`);
-    try{s.a=await tts(s.t,ac)}catch(e){voice=false;log('Giọng đọc lỗi ('+e.message+'). Các cảnh còn lại sẽ không có tiếng.');await sleep(2500)}}
+    try{s.a=await tts(s.t,ac)}catch(e){warn('Cảnh '+(i+1)+': giọng đọc lỗi ('+e.message.slice(0,150)+')');if(FATAL.test(e.message)){voice=false;warn('Tắt giọng đọc cho các cảnh còn lại (lỗi key/hạn mức).')}}}
    s.d=s.a?s.a.duration+.5:Math.max(3,s.t.split(' ').length*.4);
   }
+  if(voice)for(let i=0;i<S.length;i++)if(!S[i].a){log(`Thử lại giọng đọc cảnh ${i+1}...`);await sleep(15000);try{S[i].a=await tts(S[i].t,ac);S[i].d=S[i].a.duration+.5}catch(e){warn('Cảnh '+(i+1)+' vẫn lỗi giọng đọc, sẽ để im lặng.')}}
   let logo=null;const lf=$('lg').files[0];if(lf){logo=new Image();logo.src=URL.createObjectURL(lf);await logo.decode()}
   let mus=null;const mf=$('mus').files[0];if(mf){log('Đang nạp nhạc nền...');mus=await ac.decodeAudioData(await mf.arrayBuffer())}
   const sn=document.createElement('canvas');sn.width=W;sn.height=H;const sx=sn.getContext('2d');
@@ -318,7 +343,7 @@ $('b2').onclick=async()=>{
   })()});
   rec.stop();await new Promise(r=>rec.onstop=r);
   S.forEach(s=>s.v.pause());
-  if(bad)throw new Error('Trình duyệt chặn video từ Pixabay (CORS). Thử lại hoặc đổi từ khóa.');
+  if(bad)throw new Error('Trình duyệt chặn video từ nguồn stock (CORS). Thử lại hoặc đổi từ khóa.');
   const type=mt.split(';')[0],url=URL.createObjectURL(new Blob(chunks,{type}));
   $('rv').src=url;$('dl').href=url;$('dl').download='video-'+Date.now()+(type=='video/mp4'?'.mp4':'.webm');
   cv.hidden=true;$('out').hidden=false;log('Xong! Xem thử và tải về bên dưới.');
