@@ -27,7 +27,7 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 <div class="g">
 <div><label>Gemini API key</label><input id="gk" type="password" autocomplete="off"></div>
 <div><label>Pixabay API key</label><input id="pk" type="password" autocomplete="off"></div>
-<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option></select></div>
+<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option><option value="plain">Nền màu + phụ đề (không cần hình, để thử nhanh)</option></select></div>
 <div id="lf" hidden><label>Chọn video hoặc ảnh từ máy (chọn nhiều file, gán lần lượt cho các cảnh)</label><input id="lfi" type="file" multiple accept="video/*,image/*"></div>
 <div><label>OpenAI API key (platform.openai.com)</label><input id="ok" type="password" autocomplete="off"></div>
 <div><label>Model ảnh OpenAI</label><input id="om" value="gpt-image-2"></div>
@@ -72,12 +72,13 @@ async function F(url,opt,name){
  catch(e){throw new Error(`Không kết nối được ${name} (${e.message}). Kiểm tra mạng/VPN, tắt AdBlock hoặc kiểm tra lại API key.`)}
 }
 async function gem(model,body){
+ let last='';
  for(let i=0;i<3;i++){
   const r=await F(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${$('gk').value.trim()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},'Gemini');
-  if(r.status==429||r.status==503){log(`Gemini đang giới hạn tốc độ, chờ ${8*(i+1)}s rồi thử lại...`);await sleep(8000*(i+1));continue}
+  if(r.status==429||r.status==503){const em=(await r.json().catch(()=>({}))).error?.message||'';last=em;if(/limit: 0/i.test(em))throw new Error('Gemini không còn hạn mức miễn phí cho model "'+model+'": '+em.slice(0,150));log(`Gemini đang giới hạn tốc độ, chờ ${8*(i+1)}s rồi thử lại...`);await sleep(8000*(i+1));continue}
   const j=await r.json();if(!r.ok)throw new Error(j.error?.message||r.status);return j;
  }
- throw new Error('Gemini hết quota hoặc quá tải, thử lại sau ít phút');
+ throw new Error('Gemini quá tải hoặc hết quota: '+last.slice(0,150));
 }
 function render(d){
  $('ti').value=d.title;$('sl').innerHTML='';
@@ -139,6 +140,14 @@ async function gptImg(s){
  const im=new Image();im.src='data:image/png;base64,'+j.data[0].b64_json;
  await im.decode();im.play=()=>{};im.pause=()=>{};return im;
 }
+let aiDead=false;
+async function plainImg(s){
+ const p=$('ar').value=='p',c=document.createElement('canvas');c.width=p?720:1280;c.height=p?1280:720;
+ const x=c.getContext('2d'),g=x.createLinearGradient(0,0,c.width,c.height),h=[[26,26,28,70,52,0],[20,24,30,0,50,70],[28,22,22,64,34,14]][s.i%3];
+ g.addColorStop(0,`rgb(${h[0]},${h[1]},${h[2]})`);g.addColorStop(1,`rgb(${h[3]},${h[4]},${h[5]})`);
+ x.fillStyle=g;x.fillRect(0,0,c.width,c.height);
+ const im=new Image();im.src=c.toDataURL('image/jpeg',.85);await im.decode();im.play=()=>{};im.pause=()=>{};return im;
+}
 async function localMedia(s){
  const fs=[...$('lfi').files];if(!fs.length)throw new Error('Chưa chọn file video/ảnh từ máy tính');
  const f=fs[s.i%fs.length],u=URL.createObjectURL(f);
@@ -148,7 +157,11 @@ async function localMedia(s){
 async function media(s){
  const src=$('src').value;
  if(src=='local')return localMedia(s);
- if(src=='ai')return aiImg(s);
+ if(src=='plain')return plainImg(s);
+ if(src=='ai'){
+  if(!aiDead)try{return await aiImg(s)}catch(e){aiDead=true;log('Ảnh AI lỗi: '+e.message.slice(0,200)+'\nCác cảnh còn lại dùng nền màu.');await sleep(3000)}
+  return plainImg(s);
+ }
  if(src=='gpt')return gptImg(s);
  const f=src=='pexels'?pexels:pick;
  const u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');
@@ -171,7 +184,7 @@ function text(c,t,W,y,size,color,boxed){
 }
 
 $('b2').onclick=async()=>{
- save();const b=$('b2');b.disabled=true;$('out').hidden=true;
+ save();const b=$('b2');b.disabled=true;$('out').hidden=true;aiDead=false;
  let ac,rec;
  try{
   const S=[...$('sl').children].map((e,i)=>({t:e.children[1].value.trim(),k:e.children[3].value.trim(),i}));
