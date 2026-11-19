@@ -65,11 +65,21 @@ details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;fo
 <div class="card"><div id="log">Nhập khóa API rồi bấm "Tạo kịch bản".</div>
 <div id="warn" style="color:#ff8a65;font-size:13px;white-space:pre-wrap"></div>
 <canvas id="cv" hidden></canvas>
-<div id="out" hidden><video id="rv" controls></video><a class="b" id="dl">Tải video về</a></div></div>
+<div id="out" hidden><video id="rv" controls></video><a class="b" id="dl">Tải video về</a>
+<div id="soc" style="margin-top:18px"><h2>Đăng lên mạng xã hội</h2>
+<label>Link Fanpage Facebook</label><input id="sfb" placeholder="https://facebook.com/...">
+<label>Link kênh TikTok</label><input id="stk" placeholder="https://tiktok.com/@...">
+<label>Link kênh YouTube</label><input id="syt" placeholder="https://youtube.com/@...">
+<p><button id="bcap">Tạo nội dung đăng bài bằng AI</button> <span id="capmsg" class="m"></span></p>
+<div id="cap" hidden>
+<label>Facebook Reels (nội dung bài đăng)</label><textarea id="cfb" rows="5"></textarea><button class="cb" data-c="cfb">Sao chép</button> <a class="b" href="https://business.facebook.com/latest/reels_composer" target="_blank" rel="noopener">Mở trang đăng Reels</a> <a class="b" id="ofb" target="_blank" rel="noopener">Fanpage</a>
+<label style="margin-top:12px">TikTok (mô tả + hashtag)</label><textarea id="ctk" rows="3"></textarea><button class="cb" data-c="ctk">Sao chép</button> <a class="b" href="https://www.tiktok.com/tiktokstudio/upload" target="_blank" rel="noopener">Mở trang đăng TikTok</a> <a class="b" id="otk" target="_blank" rel="noopener">Kênh</a>
+<label style="margin-top:12px">YouTube Shorts (tiêu đề, dòng trống, mô tả)</label><textarea id="cyt" rows="6"></textarea><button class="cb" data-c="cyt">Sao chép</button> <a class="b" href="https://www.youtube.com/upload" target="_blank" rel="noopener">Mở trang đăng YouTube</a> <a class="b" id="oyt" target="_blank" rel="noopener">Kênh</a>
+<p class="m">Quy trình: tải video về, sao chép nội dung, mở trang đăng của nền tảng, chọn file video và dán nội dung.</p></div></div></div>
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg','uk','ck'];
+const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg','uk','ck','sfb','stk','syt'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
@@ -364,4 +374,16 @@ const libFill=()=>document.querySelectorAll('pre.pp').forEach(p=>p.textContent=f
 $('lib').innerHTML=['Điện mặt trời','Smarthome','Camera quan sát'].map((g,gi)=>`<h2 style="margin-top:14px">${g}</h2>`+SK.slice(gi*10,gi*10+10).map((k,j)=>{const i=gi*10+j;return `<details><summary>${String(i+1).padStart(2,'0')} · ${k[0]}</summary><pre class="pp" data-i="${i}"></pre><button class="cb" data-i="${i}">Sao chép prompt</button></details>`}).join('')).join('');
 libFill();$('lsj').oninput=libFill;$('ar').addEventListener('change',libFill);
 $('lib').onclick=e=>{const b=e.target.closest('.cb');if(!b)return;try{navigator.clipboard.writeText(fullPrompt(+b.dataset.i,6,$('lsj').value.trim()))}catch(x){}b.textContent='Đã chép';setTimeout(()=>b.textContent='Sao chép prompt',1500)};
+$('bcap').onclick=async()=>{const b=$('bcap');b.disabled=true;$('capmsg').textContent='Đang viết nội dung...';
+ try{const S=getS(),p=`Anh là chuyên gia marketing cho QUAN ANH TECHNOLOGY (điện mặt trời, smarthome, camera quan sát), khách hàng Việt Nam. Video quảng cáo: "${$('ti').value}". Nội dung khách đưa vào: ${$('ex').value}. Lời đọc các cảnh: ${S.map(x=>x.t).join(' ')}.
+Viết nội dung đăng bài tiếng Việt cho từng nền tảng, bám sát nội dung trên, KHÔNG bịa giá, thông số hay cam kết tiết kiệm. Cuối mỗi nội dung có kêu gọi liên hệ và hotline: ${$('hl').value}.
+Chỉ trả JSON: {"facebook":"3-5 dòng, có emoji vừa phải, 5-8 hashtag gồm #QuanAnhTechnology","tiktok":"tối đa 150 ký tự rồi 5-6 hashtag","youtube_title":"tối đa 70 ký tự","youtube_desc":"3-4 dòng, hotline, hashtag gồm #Shorts"}`;
+ const j=await gem($('gm').value.trim(),{contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}});
+ const o=JSON.parse(j.candidates[0].content.parts[0].text.replace(/```json|```/g,'').trim());
+ $('cfb').value=o.facebook||'';$('ctk').value=o.tiktok||'';$('cyt').value=(o.youtube_title||'')+'\n\n'+(o.youtube_desc||'');
+ [['ofb','sfb'],['otk','stk'],['oyt','syt']].forEach(([a,k])=>{const u=$(k).value.trim();$(a).hidden=!u;if(u)$(a).href=u});
+ $('cap').hidden=false;$('capmsg').textContent='Anh có thể sửa nội dung trước khi sao chép.'}
+ catch(e){$('capmsg').textContent='Lỗi: '+e.message.slice(0,160)}
+ b.disabled=false;b.textContent='Tạo lại nội dung đăng bài'};
+$('soc').addEventListener('click',e=>{const b=e.target.closest('.cb[data-c]');if(!b)return;try{navigator.clipboard.writeText($(b.dataset.c).value)}catch(x){$(b.dataset.c).select()}b.textContent='Đã chép';setTimeout(()=>b.textContent='Sao chép',1500)});
 </script></body></html>
