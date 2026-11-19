@@ -27,14 +27,16 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 <div class="g">
 <div><label>Gemini API key</label><input id="gk" type="password" autocomplete="off"></div>
 <div><label>Pixabay API key</label><input id="pk" type="password" autocomplete="off"></div>
-<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option></select></div>
+<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option></select></div>
+<div id="lf" hidden><label>Chọn video hoặc ảnh từ máy (chọn nhiều file, gán lần lượt cho các cảnh)</label><input id="lfi" type="file" multiple accept="video/*,image/*"></div>
 <div><label>OpenAI API key (platform.openai.com)</label><input id="ok" type="password" autocomplete="off"></div>
 <div><label>Model ảnh OpenAI</label><input id="om" value="gpt-image-2"></div>
 <div><label>Pexels API key (pexels.com/api)</label><input id="xk" type="password" autocomplete="off"></div>
 <div><label>Model vẽ ảnh (nguồn ảnh AI)</label><input id="im" value="gemini-2.5-flash-image"></div>
 <div><label>Model viết kịch bản</label><input id="gm" value="gemini-3.1-flash-lite"></div>
 <div><label>Model giọng đọc</label><input id="tm" value="gemini-2.5-flash-preview-tts"></div>
-<div><label>Giọng đọc</label><select id="vc"><option>Kore</option><option>Puck</option><option>Charon</option><option>Aoede</option><option>Fenrir</option><option>Leda</option></select></div>
+<div><label>Giọng đọc</label><select id="vc"><option value="Kore">Kore (nữ, chắc, rõ)</option><option value="Aoede">Aoede (nữ, nhẹ nhàng)</option><option value="Leda">Leda (nữ, trẻ)</option><option value="Charon">Charon (nam, thông tin)</option><option value="Puck">Puck (nam, vui tươi)</option><option value="Fenrir">Fenrir (nam, sôi nổi)</option></select></div>
+<div><label>Phong cách đọc (tiếng Việt)</label><input id="vs" value="Hãy đọc bằng tiếng Việt chuẩn, rõ ràng, thân thiện, tốc độ vừa phải:"></div>
 </div>
 <label class="ck"><input type="checkbox" id="sv" checked> Nhớ khóa trên trình duyệt này</label></div>
 
@@ -59,11 +61,12 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','xk','ok','om','src','im','gm','tm','vc','hl'];
+const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
 
+$('src').onchange=()=>{$('lf').hidden=$('src').value!='local'};$('src').onchange();
 async function F(url,opt,name){
  try{return await fetch(url,opt)}
  catch(e){throw new Error(`Không kết nối được ${name} (${e.message}). Kiểm tra mạng/VPN, tắt AdBlock hoặc kiểm tra lại API key.`)}
@@ -136,8 +139,15 @@ async function gptImg(s){
  const im=new Image();im.src='data:image/png;base64,'+j.data[0].b64_json;
  await im.decode();im.play=()=>{};im.pause=()=>{};return im;
 }
+async function localMedia(s){
+ const fs=[...$('lfi').files];if(!fs.length)throw new Error('Chưa chọn file video/ảnh từ máy tính');
+ const f=fs[s.i%fs.length],u=URL.createObjectURL(f);
+ if(f.type.startsWith('image')){const im=new Image();im.src=u;await im.decode();im.play=()=>{};im.pause=()=>{};return im}
+ return load(u);
+}
 async function media(s){
  const src=$('src').value;
+ if(src=='local')return localMedia(s);
  if(src=='ai')return aiImg(s);
  if(src=='gpt')return gptImg(s);
  const f=src=='pexels'?pexels:pick;
@@ -146,7 +156,7 @@ async function media(s){
  return load(u);
 }
 async function tts(text,ac){
- const j=await gem($('tm').value.trim(),{contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
+ const j=await gem($('tm').value.trim(),{contents:[{parts:[{text:($('vs').value.trim()?$('vs').value.trim()+' ':'')+text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
  const bin=atob(j.candidates[0].content.parts[0].inlineData.data),n=bin.length>>1,buf=ac.createBuffer(1,n,24000),ch=buf.getChannelData(0);
  for(let i=0;i<n;i++){let v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v>32767)v-=65536;ch[i]=v/32768}
  return buf;
@@ -164,7 +174,7 @@ $('b2').onclick=async()=>{
  save();const b=$('b2');b.disabled=true;$('out').hidden=true;
  let ac,rec;
  try{
-  const S=[...$('sl').children].map(e=>({t:e.children[1].value.trim(),k:e.children[3].value.trim()}));
+  const S=[...$('sl').children].map((e,i)=>({t:e.children[1].value.trim(),k:e.children[3].value.trim(),i}));
   const port=$('ar').value=='p',W=port?720:1280,H=port?1280:720,title=$('ti').value,end=$('hl').value;
   ac=new(window.AudioContext||window.webkitAudioContext)();
   let voice=true;
