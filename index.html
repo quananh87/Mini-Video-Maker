@@ -28,10 +28,11 @@ details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;fo
 <div class="g">
 <div><label>Gemini API key</label><input id="gk" type="password" autocomplete="off"></div>
 <div><label>Pixabay API key</label><input id="pk" type="password" autocomplete="off"></div>
-<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option><option value="plain">Nền màu + phụ đề (không cần hình, để thử nhanh)</option></select></div>
+<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="unsplash">Ảnh Unsplash (ảnh đẹp, chạy hiệu ứng zoom)</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option><option value="local">Video / ảnh từ máy tính của anh</option><option value="plain">Nền màu + phụ đề (không cần hình, để thử nhanh)</option></select></div>
 <div id="lf" hidden><label>Chọn video hoặc ảnh từ máy (chọn nhiều file, gán lần lượt cho các cảnh)</label><input id="lfi" type="file" multiple accept="video/*,image/*"></div>
 <div><label>OpenAI API key (platform.openai.com)</label><input id="ok" type="password" autocomplete="off"></div>
 <div><label>Model ảnh OpenAI</label><input id="om" value="gpt-image-2"></div>
+<div><label>Unsplash Access Key (unsplash.com/developers)</label><input id="uk" type="password" autocomplete="off"></div>
 <div><label>Pexels API key (pexels.com/api)</label><input id="xk" type="password" autocomplete="off"></div>
 <div><label>Model vẽ ảnh (nguồn ảnh AI)</label><input id="im" value="gemini-2.5-flash-image"></div>
 <div><label>Model viết kịch bản</label><input id="gm" value="gemini-3.1-flash-lite"></div>
@@ -55,18 +56,19 @@ details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;fo
 
 <div class="card" id="c2" hidden><h2>Kịch bản (sửa tự do)</h2>
 <label>Tiêu đề</label><input id="ti"><div id="sl"></div>
-<button id="b2">2. Tạo video</button> <button id="b3" style="background:#303034;color:#f4f4f5">Sao chép prompt cho công cụ video AI</button>
+<button id="b2">2. Tạo video</button> <button id="bt" style="background:#303034;color:#f4f4f5">Thử tạo hình cảnh 1</button> <button id="b3" style="background:#303034;color:#f4f4f5">Sao chép prompt cho công cụ video AI</button>
 <textarea id="pr" rows="9" hidden></textarea> <a class="b" id="dt" download="storyboard.txt" hidden>Tải storyboard (.txt)</a></div>
 
 <div class="card"><h2>Thư viện 30 Prompt Skills</h2><p class="m">Mở từng skill để xem prompt tiếng Anh, sao chép dùng cho Veo, Kling, Runway...</p><label>Thay chủ thể bằng sản phẩm của anh (không bắt buộc)</label><input id="lsj" placeholder="Ví dụ: Hikvision-style dome camera on a shophouse, tiếng Anh"><div id="lib"></div></div>
 
 <div class="card"><div id="log">Nhập khóa API rồi bấm "Tạo kịch bản".</div>
+<div id="warn" style="color:#ff8a65;font-size:13px;white-space:pre-wrap"></div>
 <canvas id="cv" hidden></canvas>
 <div id="out" hidden><video id="rv" controls></video><a class="b" id="dl">Tải video về</a></div></div>
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg'];
+const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg','uk'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
@@ -195,7 +197,7 @@ async function gptImg(s){
  const im=new Image();im.src='data:image/png;base64,'+j.data[0].b64_json;
  await im.decode();im.play=()=>{};im.pause=()=>{};return im;
 }
-let aiDead=false;
+let aiDead=false;const warn=t=>{$('warn').textContent+=t+'\n'};
 async function plainImg(s){
  const p=$('ar').value=='p',c=document.createElement('canvas');c.width=p?720:1280;c.height=p?1280:720;
  const x=c.getContext('2d'),g=x.createLinearGradient(0,0,c.width,c.height),h=[[26,26,28,70,52,0],[20,24,30,0,50,70],[28,22,22,64,34,14]][s.i%3];
@@ -209,12 +211,25 @@ async function localMedia(s){
  if(f.type.startsWith('image')){const im=new Image();im.src=u;await im.decode();im.play=()=>{};im.pause=()=>{};return im}
  return load(u);
 }
+async function unsplashImg(s){
+ const q=async kw=>{const r=await F(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(kw)}&per_page=10&orientation=${$('ar').value=='p'?'portrait':'landscape'}`,{headers:{Authorization:'Client-ID '+$('uk').value.trim(),'Accept-Version':'v1'}},'Unsplash');
+  if(r.status==401)throw new Error('Unsplash: Access Key sai (dùng Access Key, không phải Secret Key)');
+  if(r.status==403)throw new Error('Unsplash: hết 50 lượt/giờ của gói Demo. Chờ 1 giờ hoặc đổi nguồn hình.');
+  if(!r.ok)throw new Error('Unsplash lỗi '+r.status);const j=await r.json();return j.results.length?j.results[Math.floor(Math.random()*Math.min(5,j.results.length))]:null};
+ const h=await q(s.k)||await q(s.k.split(' ')[0])||await q('technology');
+ if(!h)throw new Error('Unsplash không có ảnh cho: '+s.k);
+ F(h.links.download_location,{headers:{Authorization:'Client-ID '+$('uk').value.trim()}},'Unsplash').catch(()=>{});
+ warn('Ghi nguồn cảnh '+(s.i+1)+': ảnh của '+h.user.name+' trên Unsplash');
+ const im=new Image();try{im.src=URL.createObjectURL(await(await fetch(h.urls.regular)).blob())}catch(e){im.crossOrigin='anonymous';im.src=h.urls.regular}
+ await im.decode();im.play=()=>{};im.pause=()=>{};return im;
+}
 async function media(s){
  const src=$('src').value;
+ if(src=='unsplash')return unsplashImg(s);
  if(src=='local')return localMedia(s);
  if(src=='plain')return plainImg(s);
  if(src=='ai'){
-  if(!aiDead)try{return await aiImg(s)}catch(e){aiDead=true;log('Ảnh AI lỗi: '+e.message.slice(0,200)+'\nCác cảnh còn lại dùng nền màu.');await sleep(3000)}
+  if(!aiDead)for(let a=0;a<2;a++)try{return await aiImg(s)}catch(e){warn('Cảnh '+(s.i+1)+': ảnh AI lỗi: '+e.message.slice(0,220));if(/limit: 0|billing|quota|permission|not found|not supported|API key/i.test(e.message)){aiDead=true;warn('Các cảnh còn lại dùng nền màu. Hãy đổi nguồn hình sang Pexels/Pixabay/ChatGPT hoặc bật thanh toán cho Gemini.');break}await sleep(4000)}
   return plainImg(s);
  }
  if(src=='gpt')return gptImg(s);
@@ -239,7 +254,7 @@ function text(c,t,W,y,size,color,boxed){
 }
 
 $('b2').onclick=async()=>{
- save();const b=$('b2');b.disabled=true;$('out').hidden=true;aiDead=false;
+ save();const b=$('b2');b.disabled=true;$('out').hidden=true;aiDead=false;$('warn').textContent='';
  let ac,rec;
  try{
   const S=getS();
@@ -304,11 +319,12 @@ $('b2').onclick=async()=>{
 function endCard(c,W,H,a,logo){
  const g=c.createRadialGradient(W/2,H*.45,0,W/2,H*.45,H*.7);g.addColorStop(0,'#2a2208');g.addColorStop(1,'#000');c.fillStyle=g;c.fillRect(0,0,W,H);
  c.globalAlpha=a;let y=H*.4;
- if(logo&&logo.naturalWidth){const s=Math.min(W*.5/logo.naturalWidth,H*.2/logo.naturalHeight),w=logo.naturalWidth*s,h=logo.naturalHeight*s;c.drawImage(logo,(W-w)/2,y-h/2,w,h);y+=H*.12}
+ if(logo&&logo.naturalWidth){const s=Math.min(W*.5/logo.naturalWidth,H*.2/logo.naturalHeight),w=logo.naturalWidth*s,h=logo.naturalHeight*s;c.globalCompositeOperation='lighten';c.drawImage(logo,(W-w)/2,y-h/2,w,h);c.globalCompositeOperation='source-over';y+=h/2+H*.07}
  text(c,$('br').value,W,y,W*.07,'#f5b800',false);c.fillStyle='#f5b800';c.fillRect(W*.35,y+H*.045,W*.3,3);
  if($('sg').value)text(c,$('sg').value,W,y+H*.1,W*.04,'#fff',false);
  text(c,$('hl').value,W,y+H*.18,W*.06,'#fff',false);c.globalAlpha=1;
 }
+$('bt').onclick=async()=>{save();aiDead=false;$('warn').textContent='';log('Đang thử tạo hình cho cảnh 1...');try{const m=await media(getS()[0]),p=$('ar').value=='p',cv=$('cv');cv.width=p?720:1280;cv.height=p?1280:720;cv.hidden=false;if(m.tagName=='VIDEO'){m.currentTime=.5;await sleep(400)}cover(cv.getContext('2d'),m,cv.width,cv.height);log('Đã thử xong cảnh 1 (xem khung bên dưới). Nếu chỉ thấy nền màu thì nguồn hình đang lỗi, xem dòng chữ đỏ.')}catch(e){log('Lỗi: '+e.message)}};
 const libFill=()=>document.querySelectorAll('pre.pp').forEach(p=>p.textContent=fullPrompt(+p.dataset.i,6,$('lsj').value.trim()));
 $('lib').innerHTML=['Điện mặt trời','Smarthome','Camera quan sát'].map((g,gi)=>`<h2 style="margin-top:14px">${g}</h2>`+SK.slice(gi*10,gi*10+10).map((k,j)=>{const i=gi*10+j;return `<details><summary>${String(i+1).padStart(2,'0')} · ${k[0]}</summary><pre class="pp" data-i="${i}"></pre><button class="cb" data-i="${i}">Sao chép prompt</button></details>`}).join('')).join('');
 libFill();$('lsj').oninput=libFill;$('ar').addEventListener('change',libFill);
