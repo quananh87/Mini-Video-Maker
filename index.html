@@ -27,6 +27,11 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 <div class="g">
 <div><label>Gemini API key</label><input id="gk" type="password" autocomplete="off"></div>
 <div><label>Pixabay API key</label><input id="pk" type="password" autocomplete="off"></div>
+<div><label>Nguồn hình ảnh / video</label><select id="src"><option value="pixabay">Video Pixabay</option><option value="pexels">Video Pexels</option><option value="ai">Ảnh AI do Gemini vẽ (chỉ cần key Gemini)</option><option value="gpt">Ảnh AI do ChatGPT (OpenAI) vẽ, tính phí</option></select></div>
+<div><label>OpenAI API key (platform.openai.com)</label><input id="ok" type="password" autocomplete="off"></div>
+<div><label>Model ảnh OpenAI</label><input id="om" value="gpt-image-2"></div>
+<div><label>Pexels API key (pexels.com/api)</label><input id="xk" type="password" autocomplete="off"></div>
+<div><label>Model vẽ ảnh (nguồn ảnh AI)</label><input id="im" value="gemini-2.5-flash-image"></div>
 <div><label>Model viết kịch bản</label><input id="gm" value="gemini-3.1-flash-lite"></div>
 <div><label>Model giọng đọc</label><input id="tm" value="gemini-2.5-flash-preview-tts"></div>
 <div><label>Giọng đọc</label><select id="vc"><option>Kore</option><option>Puck</option><option>Charon</option><option>Aoede</option><option>Fenrir</option><option>Leda</option></select></div>
@@ -54,7 +59,7 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','gm','tm','vc','hl'];
+const K=['gk','pk','xk','ok','om','src','im','gm','tm','vc','hl'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
@@ -96,6 +101,7 @@ Chỉ trả JSON: {"title":"...","scenes":[{"narration":"...","keyword":"..."}]}
 
 async function pick(kw){
  const r=await F(`https://pixabay.com/api/videos/?key=${$('pk').value.trim()}&q=${encodeURIComponent(kw)}&per_page=10&safesearch=true`,{},'Pixabay');
+ if(r.status==429)throw new Error('Pixabay đang giới hạn lượt gọi (rate limit). Chờ vài phút hoặc đổi nguồn hình ở phần Khóa API.');
  if(!r.ok)throw new Error('Pixabay lỗi '+r.status+' (kiểm tra API key)');
  const j=await r.json();if(!j.hits.length)return null;
  const h=j.hits[Math.floor(Math.random()*Math.min(5,j.hits.length))];
@@ -107,6 +113,38 @@ async function load(url){
  await new Promise((ok,no)=>{v.onloadeddata=ok;v.onerror=()=>no(new Error('Không tải được video Pixabay'))});
  return v;
 }
+async function pexels(kw){
+ const r=await F(`https://api.pexels.com/videos/search?query=${encodeURIComponent(kw)}&per_page=10&orientation=${$('ar').value=='p'?'portrait':'landscape'}`,{headers:{Authorization:$('xk').value.trim()}},'Pexels');
+ if(!r.ok)throw new Error('Pexels lỗi '+r.status+' (kiểm tra API key)');
+ const j=await r.json();if(!j.videos.length)return null;
+ const v=j.videos[Math.floor(Math.random()*Math.min(5,j.videos.length))];
+ const f=v.video_files.filter(x=>x.file_type=='video/mp4'&&x.width<=1280).sort((a,b)=>b.width-a.width)[0]||v.video_files[0];
+ return f.link;
+}
+async function aiImg(s){
+ const p=`Photorealistic high quality photo, no text, no logo, ${$('ar').value=='p'?'vertical':'horizontal'} framing: ${s.k}`;
+ const j=await gem($('im').value.trim(),{contents:[{parts:[{text:p}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}});
+ const part=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData);
+ if(!part)throw new Error('Gemini không trả về ảnh (key này có thể chưa được dùng model vẽ ảnh, thử đổi nguồn)');
+ const im=new Image();im.src=`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+ await im.decode();im.play=()=>{};im.pause=()=>{};return im;
+}
+async function gptImg(s){
+ const r=await F('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('ok').value.trim()},body:JSON.stringify({model:$('om').value.trim(),prompt:`Photorealistic high quality photo, no text, no logo: ${s.k}`,size:$('ar').value=='p'?'1024x1536':'1536x1024',quality:'medium',n:1})},'OpenAI');
+ const j=await r.json();
+ if(!r.ok)throw new Error('OpenAI: '+(j.error?.message||r.status));
+ const im=new Image();im.src='data:image/png;base64,'+j.data[0].b64_json;
+ await im.decode();im.play=()=>{};im.pause=()=>{};return im;
+}
+async function media(s){
+ const src=$('src').value;
+ if(src=='ai')return aiImg(s);
+ if(src=='gpt')return gptImg(s);
+ const f=src=='pexels'?pexels:pick;
+ const u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');
+ if(!u)throw new Error('Không tìm thấy video cho: '+s.k);
+ return load(u);
+}
 async function tts(text,ac){
  const j=await gem($('tm').value.trim(),{contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
  const bin=atob(j.candidates[0].content.parts[0].inlineData.data),n=bin.length>>1,buf=ac.createBuffer(1,n,24000),ch=buf.getChannelData(0);
@@ -114,7 +152,7 @@ async function tts(text,ac){
  return buf;
 }
 function wrap(c,t,mw){const L=[];let l='';for(const x of t.split(' ')){const y=l?l+' '+x:x;if(c.measureText(y).width>mw&&l){L.push(l);l=x}else l=y}L.push(l);return L}
-function cover(c,v,W,H){const w=v.videoWidth,h=v.videoHeight;if(!w)return;const s=Math.max(W/w,H/h);c.drawImage(v,(W-w*s)/2,(H-h*s)/2,w*s,h*s)}
+function cover(c,v,W,H,z=0){const w=v.videoWidth||v.naturalWidth,h=v.videoHeight||v.naturalHeight;if(!w)return;const s=Math.max(W/w,H/h)*(1+z);c.drawImage(v,(W-w*s)/2,(H-h*s)/2,w*s,h*s)}
 function text(c,t,W,y,size,color,boxed){
  c.font=`bold ${size}px system-ui,sans-serif`;c.textAlign='center';c.textBaseline='middle';
  const L=wrap(c,t,W*.86),lh=size*1.3,top=y-(L.length*lh)/2;
@@ -132,9 +170,7 @@ $('b2').onclick=async()=>{
   let voice=true;
   for(let i=0;i<S.length;i++){
    const s=S[i];log(`Cảnh ${i+1}/${S.length}: tìm video "${s.k}"...`);
-   const u=await pick(s.k)||await pick(s.k.split(' ')[0])||await pick('technology');
-   if(!u)throw new Error('Pixabay không có video cho: '+s.k);
-   s.v=await load(u);
+   s.v=await media(s);
    if(voice){log(`Cảnh ${i+1}/${S.length}: tạo giọng đọc...`);
     try{s.a=await tts(s.t,ac)}catch(e){voice=false;log('Giọng đọc lỗi ('+e.message+'). Các cảnh còn lại sẽ không có tiếng.');await sleep(2500)}}
    s.d=s.a?s.a.duration+.5:Math.max(3,s.t.split(' ').length*.4);
@@ -161,7 +197,7 @@ $('b2').onclick=async()=>{
     text(c,end,W,H/2,W*.065,'#f5b800',false);
    }else{
     if(i!=cur){if(cur>=0)S[cur].v.pause();S[i].v.currentTime=0;S[i].v.play();cur=i}
-    cover(c,S[i].v,W,H);
+    cover(c,S[i].v,W,H,S[i].v.tagName=='IMG'?(t-st[i])/S[i].d*.12:0);
     if(!chk){chk=true;try{c.getImageData(0,0,1,1)}catch(e){bad=true;done();return}}
     c.fillStyle='rgba(0,0,0,.35)';c.fillRect(0,0,W,H*.14);
     text(c,title,W,H*.07,W*.042,'#f5b800',false);
