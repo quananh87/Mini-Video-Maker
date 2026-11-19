@@ -19,6 +19,7 @@ button:disabled{opacity:.5;cursor:wait}
 #log{font-size:13px;color:var(--y);white-space:pre-wrap;min-height:20px}
 canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;display:block;margin:10px 0}
 .ck{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin-top:10px}.ck input{width:auto}
+details{border-top:1px solid var(--line);padding:6px 0}summary{cursor:pointer;font-weight:600}pre.pp{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:var(--mut);margin:8px 0 0}button.cb{margin-top:6px;padding:6px 12px;font-size:13px}
 </style></head><body><div class="w">
 <h1>Mini Video Maker</h1>
 <p class="m">Chọn chủ đề → AI viết kịch bản → ghép video Pixabay + giọng đọc + phụ đề → tải về.</p>
@@ -42,18 +43,22 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 
 <div class="card"><h2>Nội dung video</h2>
 <div class="g">
-<div><label>Chủ đề</label><select id="tp"><option value="cam">Camera quan sát</option><option value="sol">Năng lượng mặt trời</option><option value="sh">Smarthome</option><option value="own">Tự nhập</option></select></div>
-<div><label>Số cảnh</label><select id="n"><option>4</option><option selected>5</option><option>6</option><option>8</option></select></div>
+<div><label>Chủ đề</label><select id="tp"><option value="cam">Camera quan sát</option><option value="sol">Năng lượng mặt trời</option><option value="sh">Smarthome</option><option value="own">Nội dung của anh (AI tự chọn skill)</option></select></div>
+<div><label>Số cảnh</label><select id="n"><option>4</option><option>5</option><option>6</option><option>8</option><option value="9" selected>9 (chuẩn ~60 giây)</option><option value="13">13 (~90 giây)</option></select></div>
 <div><label>Khung hình</label><select id="ar"><option value="p">Dọc 9:16 (TikTok, Reels, Zalo)</option><option value="l">Ngang 16:9 (YouTube)</option></select></div>
 </div>
-<label>Ý chính / yêu cầu thêm (không bắt buộc với chủ đề có sẵn)</label>
-<textarea id="ex" rows="2" placeholder="Ví dụ: nhấn mạnh tiết kiệm tiền điện cho nhà phố, có pin lưu trữ dùng ban đêm"></textarea>
-<label>Dòng cuối video</label><input id="hl" value="Liên hệ tư vấn miễn phí: 0937677889">
+<label>Nội dung cần quảng cáo (sản phẩm, ưu đãi, đối tượng khách... AI bám sát để viết kịch bản và chọn skill quay)</label>
+<textarea id="ex" rows="4" placeholder="Ví dụ: nhấn mạnh tiết kiệm tiền điện cho nhà phố, có pin lưu trữ dùng ban đêm"></textarea>
+<label>Tên thương hiệu (thẻ kết video)</label><input id="br" value="QUAN ANH TECHNOLOGY">
+<label>Dòng cuối video</label><input id="hl" value="Hotline: 0937.677.889"><label>Slogan thẻ kết</label><input id="sg" value="Giải pháp năng lượng, camera và smarthome"><label>Logo thật (PNG/JPG, không bắt buộc, hiện ở thẻ kết)</label><input id="lg" type="file" accept="image/*"><label>Nhạc nền (mp3/wav, không bắt buộc, tự hạ nhỏ và tắt dần cuối video)</label><input id="mus" type="file" accept="audio/*">
 <button id="b1">1. Tạo kịch bản</button></div>
 
 <div class="card" id="c2" hidden><h2>Kịch bản (sửa tự do)</h2>
 <label>Tiêu đề</label><input id="ti"><div id="sl"></div>
-<button id="b2">2. Tạo video</button></div>
+<button id="b2">2. Tạo video</button> <button id="b3" style="background:#303034;color:#f4f4f5">Sao chép prompt cho công cụ video AI</button>
+<textarea id="pr" rows="9" hidden></textarea> <a class="b" id="dt" download="storyboard.txt" hidden>Tải storyboard (.txt)</a></div>
+
+<div class="card"><h2>Thư viện 30 Prompt Skills</h2><p class="m">Mở từng skill để xem prompt tiếng Anh, sao chép dùng cho Veo, Kling, Runway...</p><label>Thay chủ thể bằng sản phẩm của anh (không bắt buộc)</label><input id="lsj" placeholder="Ví dụ: Hikvision-style dome camera on a shophouse, tiếng Anh"><div id="lib"></div></div>
 
 <div class="card"><div id="log">Nhập khóa API rồi bấm "Tạo kịch bản".</div>
 <canvas id="cv" hidden></canvas>
@@ -61,7 +66,7 @@ canvas,video{max-width:100%;max-height:68vh;border-radius:8px;background:#000;di
 </div>
 <script>
 const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms)),log=t=>$('log').textContent=t;
-const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl'];
+const K=['gk','pk','xk','ok','om','src','im','vs','gm','tm','vc','hl','br','sg'];
 try{K.forEach(k=>{const v=localStorage.getItem('mv_'+k);if(v)$(k).value=v})}catch(e){}
 const save=()=>{if(!$('sv').checked)return;try{K.forEach(k=>localStorage.setItem('mv_'+k,$(k).value))}catch(e){}};
 const TOP={cam:'Camera quan sát an ninh cho nhà ở, cửa hàng, xưởng',sol:'Điện năng lượng mặt trời hòa lưới và pin lưu trữ cho gia đình, doanh nghiệp',sh:'Smarthome nhà thông minh: điều khiển đèn, rèm, máy lạnh, khóa cửa bằng điện thoại',own:''};
@@ -80,11 +85,60 @@ async function gem(model,body){
  }
  throw new Error('Gemini quá tải hoặc hết quota: '+last.slice(0,150));
 }
+/* 30 Prompt Skills: tên|góc máy|chuyển động|mã chuyển động(i=tiến,o=lùi,p=lia,b=quay quanh,s=tĩnh)|ánh sáng|chuyển cảnh|mã chuyển cảnh(f=mờ,w=quét sáng,x=chớp)|chủ thể */
+const SK=`Drone toàn cảnh|high altitude aerial drone wide shot|smooth forward drone flight, slowly descending toward the rooftop solar panels|i|golden hour sunrise, warm sunlight, realistic reflections on solar panels|smooth cinematic fade in|f|modern rooftop solar power installation on a Vietnamese residential house, clean rooftop, green surroundings
+Cận cảnh tấm pin|extreme close-up macro shot|slow horizontal tracking across the panel surface|p|natural sunlight reflecting softly on glass|elegant light sweep|w|photovoltaic solar cells with fine glass texture
+Thi công điện mặt trời|medium wide shot from rooftop level|smooth tracking shot following technicians|p|bright natural daylight, realistic shadows|smooth match cut|x|technicians installing solar panels on a Vietnamese residential rooftop, mounting rails, organized cables
+Inverter hero|low angle hero product shot|slow cinematic dolly in|i|dramatic studio lighting, subtle golden highlights|smooth focus pull|x|modern solar hybrid inverter with display screen and electrical connections in a clean equipment room
+Pin lưu trữ|close-up hero shot transitioning to medium wide|slow dolly out revealing the full installation|o|blue ambient light with warm golden highlights|smooth energy flow transition|w|residential lithium energy storage battery cabinet, professional installation, subtle energy glow
+Dòng năng lượng|wide architectural view|slow cinematic orbit around the house|b|bright natural daylight|smooth energy line match cut|w|modern house with rooftop solar panels, golden energy lines flowing from panels to inverter, appliances and battery
+Nhà máy điện mặt trời|extreme wide aerial drone shot|smooth drone pull back, gradually ascending|o|golden hour, long shadows|cinematic reveal|f|large industrial solar farm, symmetrical panel rows, modern factory in the background
+Gia đình dùng điện mặt trời|wide cinematic exterior lifestyle shot|slow dolly in toward the house|i|soft morning sunlight, warm welcoming atmosphere|soft cinematic dissolve|d|beautiful modern Vietnamese family home with a happy family and rooftop solar panels, green garden
+Ngày sang đêm|fixed wide exterior architectural shot|smooth cinematic time-lapse|s|transition from bright daylight to evening blue hour|seamless day-to-night transition|f|residential solar home, panels collecting sunlight by day and the home warmly lit at night
+Hero kết điện mặt trời|wide hero shot|slow orbit followed by a gentle push in|b|golden rim lighting at sunset|cinematic fade out|f|complete residential solar system with rooftop panels, inverter and battery storage, clean negative space at the bottom for logo
+Mở đầu nhà thông minh|wide architectural interior shot|smooth slow dolly in through the living room|i|warm architectural lighting|cinematic reveal|f|luxurious modern Vietnamese living room where smart lights activate and curtains open automatically
+Điều khiển giọng nói|medium shot of a homeowner|slow cinematic push in|i|warm ambient lighting|smooth sound wave transition|w|homeowner giving a voice command, lights turn on and curtains open, subtle sound wave graphics
+Đèn tự động|wide interior shot|smooth cinematic pan from left to right|p|warm white to elegant ambient lighting|light sweep|w|modern living room with recessed lights, LED strips and smart switches
+Rèm tự động|wide backlit shot facing a bedroom window|slow dolly forward|i|soft golden sunrise backlight|smooth brightness transition|f|motorized curtains opening to reveal a morning landscape in a premium bedroom
+Máy lạnh thông minh|close-up of a smart sensor then wide living room|cinematic rack focus then smooth pan|p|cool blue ambient with natural daylight|smooth focus transition|x|smart temperature sensor and air conditioner activating automatically in a living room
+Khóa cửa thông minh|extreme close-up|slow cinematic orbit|b|premium metallic highlights, soft shadows|cinematic match cut|x|fingerprint smart door lock, a finger on the sensor, the door unlocking
+Điều khiển qua điện thoại|over-the-shoulder shot|slow push in toward the smartphone|i|soft natural daylight, warm interior highlights|screen match cut|x|homeowner tapping a generic smart home app to control lights, curtains and air conditioning
+Good Morning|wide cinematic bedroom shot|smooth tracking from bedroom toward the living area|p|warm golden morning sunlight|soft cinematic dissolve|d|curtains opening, lights turning on gradually and a smart speaker activating in a Vietnamese family home
+Good Night|wide interior shot at night|slow smooth pan across the living room|p|deep blue night ambience with warm pathway lights|cinematic fade to dark|f|main lights off, curtains closing, security system activating, soft night lights remaining
+Hero kết nhà thông minh|wide architectural hero shot|smooth cinematic orbit|b|elegant warm and cool ambient lighting|cinematic fade out|f|modern connected luxury Vietnamese home where lighting, curtains, climate and security work together, clean negative space at the bottom for logo
+Camera hero|low angle close-up hero shot|slow cinematic orbit|b|dramatic blue lighting, metallic highlights|lens reflection|w|professional outdoor security camera with weatherproof housing and mounting bracket on a residential exterior at night
+Thi công camera|medium shot|smooth tracking shot following the technician|p|natural daylight with realistic shadows|smooth match cut|x|qualified technician mounting an outdoor CCTV camera, adjusting the angle and organizing wiring
+Hồng ngoại ban đêm|wide exterior shot at night|slow push in toward the security camera|i|very low ambient light transitioning to infrared night vision|night vision mode switch|f|modern house at night in detailed monochrome infrared footage with a subtle camera interface overlay
+Ban đêm có màu|wide night shot|slow dolly in|i|realistic low light with subtle spotlight|cinematic color reveal|f|person walking through the entrance captured in detailed full-color night footage, realistic exposure
+AI nhận diện người|medium wide surveillance perspective|smooth tracking|p|realistic evening lighting|smooth AI interface reveal|w|home entrance where a human figure is detected with a subtle rectangular detection frame
+Camera tự theo dõi|medium shot|smooth orbit revealing pan and tilt rotation|b|natural daylight|motion match cut|x|outdoor pan-tilt camera smoothly following a person walking across a garden
+Camera hai mắt|extreme close-up macro shot|slow orbit then smooth pull back|o|premium studio lighting, reflections on both lenses|split-view reveal|w|dual lens CCTV camera with two clearly visible lenses and professional housing
+Xem camera qua điện thoại|over-the-shoulder shot|slow push in toward the phone screen|i|warm interior lighting|smooth screen transition|w|homeowner viewing a live camera feed of their home on a generic CCTV app
+Nhà xưởng, kho bãi|extreme wide shot|smooth crane movement with slow dolly forward|i|industrial cinematic lighting|fast smooth multi-camera montage|x|large Vietnamese warehouse and production floor monitored by multiple surveillance cameras
+Hero kết camera|wide hero shot|slow cinematic pull back|o|deep blue lighting with elegant golden highlights|elegant brand reveal|f|modern Vietnamese home with professional surveillance cameras and subtle network visualization, clean negative space at the bottom for logo`.split('\n').map(l=>l.split('|'));
+const SEQ={sol:[1,2,3,4,5,6,8,9,10],sh:[11,12,13,14,15,16,17,18,20],cam:[21,22,23,24,25,26,27,28,30]};
+const NOTE={16:'Use a generic realistic app interface without fabricated brand logos or unreadable text.',23:'Preserve realistic night exposure and avoid excessive artificial brightness.',24:'Detection overlays should appear realistic and unobtrusive.',27:'Do not generate fabricated brand names or unreadable interface text.'};
+const fullPrompt=(i,sec,sj)=>{const k=SK[i];return `Create a premium cinematic commercial scene.\nCamera angle: ${k[1]}.\nCamera movement: ${k[2]}.\nLighting: ${k[4]}.\nSubject: ${sj||k[7]}, in a realistic Vietnamese setting.\nVisual effects: subtle, realistic, premium depth of field.\nTransition: ${k[5]}.\n`+(NOTE[i]?`Important: ${NOTE[i]}\n`:'')+`Brand look: black and gold accents. Do not fabricate logos, brand names, specifications or readable text; leave clean space for logo and hotline in editing.\nPhotorealistic, ultra detailed, premium commercial cinematography, 4K, ${$('ar').value=='p'?'vertical 9:16':'horizontal 16:9'}.\nDuration: ${sec} seconds.`};
+const imgPrompt=s=>{const k=SK[s.sk];return `Photorealistic premium commercial photo, ${$('ar').value=='p'?'vertical 9:16':'horizontal 16:9'}. ${s.sj||k[7]}. Camera: ${k[1]}. Lighting: ${k[4]}. Realistic Vietnamese setting, black and gold premium look, no text, no logos, no watermarks.`+(s.k?' Extra: '+s.k:'')};
+const getS=()=>[...$('sl').children].map((e,i)=>({t:e.querySelector('.nr').value.trim(),c:e.querySelector('.cp').value.trim(),k:e.querySelector('.kw').value.trim(),sj:e.querySelector('.sj').value.trim(),sk:+e.querySelector('.sk').value,i}));
+$('b3').onclick=()=>{
+ const t=$('ti').value+'\n\n'+getS().map((s,i)=>{const k=SK[s.sk];return `SCENE ${i+1} - ${k[0]}\nCamera angle: ${k[1]}\nCamera movement: ${k[2]}\nLighting: ${k[4]}\nTransition: ${k[5]}\n--- AI video prompt ---\n${fullPrompt(s.sk,6,s.sj)}\n--- end prompt ---\nVietnamese voice-over: ${s.t}\nOn-screen caption: ${s.c}`}).join('\n\n')+`\n\nFINAL: brand closing - ${$('br').value} | ${$('hl').value}. Add the real logo and hotline in editing.`;
+ $('pr').value=t;$('pr').hidden=false;$('pr').select();try{navigator.clipboard.writeText(t)}catch(e){}
+ $('dt').href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));$('dt').hidden=false;
+};
+function mot(m,p){return m=='i'?[.04+.16*p,0]:m=='o'?[.2-.16*p,0]:m=='p'?[.1,(p-.5)*2]:m=='b'?[.08+.08*p,(p-.5)*1.5]:[.03*p,0]}
+function fx(c,k,lt,W,H){
+ if(lt>.5)return;const a=1-lt/.5;
+ if(k=='f'){c.fillStyle=`rgba(0,0,0,${a})`;c.fillRect(0,0,W,H)}
+ else if(k=='x'){c.fillStyle=`rgba(255,255,255,${a*.5})`;c.fillRect(0,0,W,H)}
+ else if(k=='w'){const x=(lt/.5)*W*1.6-W*.3,g=c.createLinearGradient(x-W*.3,0,x+W*.3,0);g.addColorStop(0,'rgba(245,184,0,0)');g.addColorStop(.5,'rgba(245,184,0,.55)');g.addColorStop(1,'rgba(245,184,0,0)');c.fillStyle=g;c.fillRect(0,0,W,H)}
+}
 function render(d){
  $('ti').value=d.title;$('sl').innerHTML='';
  d.scenes.forEach((s,i)=>{const e=document.createElement('div');e.className='sc';
-  e.innerHTML=`<label>Cảnh ${i+1}: lời đọc</label><textarea rows="2"></textarea><label>Từ khóa tìm video (tiếng Anh)</label><input>`;
-  e.children[1].value=s.narration;e.children[3].value=s.keyword;$('sl').appendChild(e)});
+  e.innerHTML=`<label>Cảnh ${i+1}: kỹ thuật quay</label><select class="sk">${SK.map((k,j)=>`<option value="${j}">${String(j+1).padStart(2,'0')} · ${k[0]}</option>`).join('')}</select><label>Lời đọc</label><textarea class="nr" rows="2"></textarea><label>Chữ hiện trên video</label><input class="cp"><label>Từ khóa tìm video (tiếng Anh)</label><input class="kw"><label>Chủ thể cảnh (tiếng Anh, dùng cho prompt và ảnh AI)</label><textarea class="sj" rows="2"></textarea>`;
+  e.querySelector('.sk').value=Math.min(29,Math.max(0,(+s.skill||1)-1));
+  e.querySelector('.nr').value=s.narration||'';e.querySelector('.cp').value=s.caption||'';e.querySelector('.kw').value=s.keyword||'';e.querySelector('.sj').value=s.subject||'';$('sl').appendChild(e)});
  $('c2').hidden=false;
 }
 $('b1').onclick=async()=>{
@@ -92,9 +146,10 @@ $('b1').onclick=async()=>{
  try{
   const topic=TOP[$('tp').value],ex=$('ex').value.trim(),n=$('n').value;
   if(!topic&&!ex)throw new Error('Chọn "Tự nhập" thì cần điền ý chính');
-  const p=`Viết kịch bản video ngắn bằng tiếng Việt về: ${topic}. ${ex}
-Gồm đúng ${n} cảnh. Mỗi cảnh có "narration" (1-2 câu, dưới 28 từ, giọng tư vấn của công ty lắp đặt, dễ hiểu) và "keyword" (1-2 từ khóa TIẾNG ANH ngắn để tìm video stock, ví dụ "security camera", "solar panels roof", "smart home phone"). Cảnh đầu thu hút người xem, cảnh cuối mời liên hệ tư vấn. Không bịa giá tiền hay số liệu cụ thể.
-Chỉ trả JSON: {"title":"...","scenes":[{"narration":"...","keyword":"..."}]}`;
+  const p=`Anh là đạo diễn quảng cáo, nhà quay phim và chuyên gia sản xuất video AI cho QUAN ANH TECHNOLOGY. Viết kịch bản video quảng cáo cao cấp bằng tiếng Việt, màu thương hiệu đen và vàng, cho khách hàng Việt Nam (hộ gia đình, chủ cửa hàng, nhà xưởng, nhà đầu tư). Chủ đề: ${topic}. Nội dung khách đưa vào (phải bám sát, ưu tiên hơn chủ đề chung): ${ex}.
+Cấu trúc cảnh: mở đầu thu hút, nhu cầu/vấn đề, công nghệ, chi tiết sản phẩm, vận hành thực tế, lợi ích, giải pháp tổng thể, kết thương hiệu.
+Gồm đúng ${n} cảnh quảng cáo kiểu điện ảnh cho thương hiệu QUAN ANH TECHNOLOGY (điện mặt trời, camera quan sát, smarthome). Mỗi cảnh chọn 1 kỹ thuật quay ("skill", số 1-30) trong thư viện: ${SK.map((k,j)=>(j+1)+'='+k[0]).join('; ')}. ${SEQ[$('tp').value]?'Thứ tự gợi ý cho chủ đề này: '+SEQ[$('tp').value].join(', ')+' (đổi cho hợp yêu cầu thêm nếu cần; nếu số cảnh khác 9 thì chọn các kỹ thuật quan trọng nhất).':'Tự chọn kỹ thuật phù hợp nhất với nội dung.'} Cảnh đầu dùng kỹ thuật mở đầu, cảnh cuối là cảnh kết thương hiệu (skill 10, 20 hoặc 30). Mỗi cảnh có "narration" (lời đọc tiếng Việt 14-20 từ, khoảng 6 giây, giọng tư vấn dễ hiểu), "caption" (chữ hiện trên video, tối đa 7 từ) và "keyword" (1-3 từ khóa TIẾNG ANH để tìm video stock). Cảnh cuối mời liên hệ tư vấn. Mỗi cảnh có thêm \"subject\" (mô tả TIẾNG ANH 12-25 từ về hình ảnh cụ thể của cảnh theo đúng nội dung khách đưa, bối cảnh Việt Nam, dùng làm chủ thể cho prompt video). Tuyệt đối không bịa giá, thông số kỹ thuật, mức tiết kiệm cam kết hay tên hãng.
+Chỉ trả JSON: {"title":"...","scenes":[{"skill":1,"narration":"...","caption":"...","keyword":"...","subject":"..."}]}`;
   log('Đang viết kịch bản...');
   const j=await gem($('gm').value.trim(),{contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}});
   render(JSON.parse(j.candidates[0].content.parts[0].text));
@@ -126,7 +181,7 @@ async function pexels(kw){
  return f.link;
 }
 async function aiImg(s){
- const p=`Photorealistic high quality photo, no text, no logo, ${$('ar').value=='p'?'vertical':'horizontal'} framing: ${s.k}`;
+ const p=imgPrompt(s);
  const j=await gem($('im').value.trim(),{contents:[{parts:[{text:p}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}});
  const part=(j.candidates?.[0]?.content?.parts||[]).find(x=>x.inlineData);
  if(!part)throw new Error('Gemini không trả về ảnh (key này có thể chưa được dùng model vẽ ảnh, thử đổi nguồn)');
@@ -134,7 +189,7 @@ async function aiImg(s){
  await im.decode();im.play=()=>{};im.pause=()=>{};return im;
 }
 async function gptImg(s){
- const r=await F('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('ok').value.trim()},body:JSON.stringify({model:$('om').value.trim(),prompt:`Photorealistic high quality photo, no text, no logo: ${s.k}`,size:$('ar').value=='p'?'1024x1536':'1536x1024',quality:'medium',n:1})},'OpenAI');
+ const r=await F('https://api.openai.com/v1/images/generations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('ok').value.trim()},body:JSON.stringify({model:$('om').value.trim(),prompt:imgPrompt(s),size:$('ar').value=='p'?'1024x1536':'1536x1024',quality:'medium',n:1})},'OpenAI');
  const j=await r.json();
  if(!r.ok)throw new Error('OpenAI: '+(j.error?.message||r.status));
  const im=new Image();im.src='data:image/png;base64,'+j.data[0].b64_json;
@@ -175,7 +230,7 @@ async function tts(text,ac){
  return buf;
 }
 function wrap(c,t,mw){const L=[];let l='';for(const x of t.split(' ')){const y=l?l+' '+x:x;if(c.measureText(y).width>mw&&l){L.push(l);l=x}else l=y}L.push(l);return L}
-function cover(c,v,W,H,z=0){const w=v.videoWidth||v.naturalWidth,h=v.videoHeight||v.naturalHeight;if(!w)return;const s=Math.max(W/w,H/h)*(1+z);c.drawImage(v,(W-w*s)/2,(H-h*s)/2,w*s,h*s)}
+function cover(c,v,W,H,z=0,px=0){const w=v.videoWidth||v.naturalWidth,h=v.videoHeight||v.naturalHeight;if(!w)return;const s=Math.max(W/w,H/h)*(1+z);c.drawImage(v,(W-w*s)/2+px*W*.05,(H-h*s)/2,w*s,h*s)}
 function text(c,t,W,y,size,color,boxed){
  c.font=`bold ${size}px system-ui,sans-serif`;c.textAlign='center';c.textBaseline='middle';
  const L=wrap(c,t,W*.86),lh=size*1.3,top=y-(L.length*lh)/2;
@@ -187,7 +242,7 @@ $('b2').onclick=async()=>{
  save();const b=$('b2');b.disabled=true;$('out').hidden=true;aiDead=false;
  let ac,rec;
  try{
-  const S=[...$('sl').children].map((e,i)=>({t:e.children[1].value.trim(),k:e.children[3].value.trim(),i}));
+  const S=getS();
   const port=$('ar').value=='p',W=port?720:1280,H=port?1280:720,title=$('ti').value,end=$('hl').value;
   ac=new(window.AudioContext||window.webkitAudioContext)();
   let voice=true;
@@ -198,15 +253,19 @@ $('b2').onclick=async()=>{
     try{s.a=await tts(s.t,ac)}catch(e){voice=false;log('Giọng đọc lỗi ('+e.message+'). Các cảnh còn lại sẽ không có tiếng.');await sleep(2500)}}
    s.d=s.a?s.a.duration+.5:Math.max(3,s.t.split(' ').length*.4);
   }
+  let logo=null;const lf=$('lg').files[0];if(lf){logo=new Image();logo.src=URL.createObjectURL(lf);await logo.decode()}
+  let mus=null;const mf=$('mus').files[0];if(mf){log('Đang nạp nhạc nền...');mus=await ac.decodeAudioData(await mf.arrayBuffer())}
+  const sn=document.createElement('canvas');sn.width=W;sn.height=H;const sx=sn.getContext('2d');
   const cv=$('cv');cv.width=W;cv.height=H;cv.hidden=false;const c=cv.getContext('2d');
   const dest=ac.createMediaStreamDestination(),stream=cv.captureStream(30);
   dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mt=['video/mp4;codecs=avc1,mp4a.40.2','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
   rec=new MediaRecorder(stream,{mimeType:mt,videoBitsPerSecond:4e6});
   const chunks=[];rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
-  const st=[];let acc=0;S.forEach(s=>{st.push(acc);acc+=s.d});const T=acc+2.5;
+  const st=[];let acc=0;S.forEach(s=>{st.push(acc);acc+=s.d});const E=3.5,T=acc+E;
   await ac.resume();rec.start(1000);
   const t0=ac.currentTime+.3;
+  if(mus){const m=ac.createBufferSource(),gn=ac.createGain();m.buffer=mus;m.loop=true;gn.gain.setValueAtTime(.12,t0);gn.gain.setValueAtTime(.12,t0+T-1.5);gn.gain.linearRampToValueAtTime(0,t0+T);m.connect(gn);gn.connect(dest);m.start(t0)}
   S.forEach((s,i)=>{if(s.a){const n=ac.createBufferSource();n.buffer=s.a;n.connect(dest);n.start(t0+st[i]+.15)}});
   let cur=-1,chk=false,bad=false;
   await new Promise(done=>{(function f(){
@@ -217,14 +276,17 @@ $('b2').onclick=async()=>{
    const i=S.findIndex((s,k)=>t<st[k]+s.d);
    if(i<0){
     if(cur>=0){S[cur].v.pause();cur=-1}
-    text(c,end,W,H/2,W*.065,'#f5b800',false);
+    endCard(c,W,H,Math.min(1,(t-acc)/.8),logo);
    }else{
     if(i!=cur){if(cur>=0)S[cur].v.pause();S[i].v.currentTime=0;S[i].v.play();cur=i}
-    cover(c,S[i].v,W,H,S[i].v.tagName=='IMG'?(t-st[i])/S[i].d*.12:0);
+    const lt=t-st[i],mo=mot(SK[S[i].sk][3],lt/S[i].d);
+    cover(c,S[i].v,W,H,mo[0],mo[1]);const tk=SK[S[i].sk][6];if(tk=='d'&&i>0&&lt<.7){c.globalAlpha=1-lt/.7;c.drawImage(sn,0,0);c.globalAlpha=1}else fx(c,tk,lt,W,H);sx.drawImage(cv,0,0);
     if(!chk){chk=true;try{c.getImageData(0,0,1,1)}catch(e){bad=true;done();return}}
     c.fillStyle='rgba(0,0,0,.35)';c.fillRect(0,0,W,H*.14);
     text(c,title,W,H*.07,W*.042,'#f5b800',false);
-    text(c,S[i].t,W,H*.78,W*.048,'#fff',true);
+    const vg=c.createLinearGradient(0,H*.58,0,H);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.78)');c.fillStyle=vg;c.fillRect(0,H*.58,W,H*.42);
+    c.globalAlpha=Math.min(1,lt/.5);if(S[i].c){c.fillStyle='#f5b800';c.fillRect(W*.44,H*.665,W*.12,4);text(c,S[i].c,W,H*.71,W*.058,'#f5b800',false)}c.globalAlpha=1;
+    text(c,S[i].t,W,H*.84,W*.042,'#fff',false);
    }
    log(`Đang ghi video... ${Math.min(100,Math.round(t/T*100))}% (giữ tab này mở)`);
    requestAnimationFrame(f);
@@ -239,4 +301,16 @@ $('b2').onclick=async()=>{
  try{ac&&ac.close()}catch(e){}
  b.disabled=false;
 };
+function endCard(c,W,H,a,logo){
+ const g=c.createRadialGradient(W/2,H*.45,0,W/2,H*.45,H*.7);g.addColorStop(0,'#2a2208');g.addColorStop(1,'#000');c.fillStyle=g;c.fillRect(0,0,W,H);
+ c.globalAlpha=a;let y=H*.4;
+ if(logo&&logo.naturalWidth){const s=Math.min(W*.5/logo.naturalWidth,H*.2/logo.naturalHeight),w=logo.naturalWidth*s,h=logo.naturalHeight*s;c.drawImage(logo,(W-w)/2,y-h/2,w,h);y+=H*.12}
+ text(c,$('br').value,W,y,W*.07,'#f5b800',false);c.fillStyle='#f5b800';c.fillRect(W*.35,y+H*.045,W*.3,3);
+ if($('sg').value)text(c,$('sg').value,W,y+H*.1,W*.04,'#fff',false);
+ text(c,$('hl').value,W,y+H*.18,W*.06,'#fff',false);c.globalAlpha=1;
+}
+const libFill=()=>document.querySelectorAll('pre.pp').forEach(p=>p.textContent=fullPrompt(+p.dataset.i,6,$('lsj').value.trim()));
+$('lib').innerHTML=['Điện mặt trời','Smarthome','Camera quan sát'].map((g,gi)=>`<h2 style="margin-top:14px">${g}</h2>`+SK.slice(gi*10,gi*10+10).map((k,j)=>{const i=gi*10+j;return `<details><summary>${String(i+1).padStart(2,'0')} · ${k[0]}</summary><pre class="pp" data-i="${i}"></pre><button class="cb" data-i="${i}">Sao chép prompt</button></details>`}).join('')).join('');
+libFill();$('lsj').oninput=libFill;$('ar').addEventListener('change',libFill);
+$('lib').onclick=e=>{const b=e.target.closest('.cb');if(!b)return;try{navigator.clipboard.writeText(fullPrompt(+b.dataset.i,6,$('lsj').value.trim()))}catch(x){}b.textContent='Đã chép';setTimeout(()=>b.textContent='Sao chép prompt',1500)};
 </script></body></html>
