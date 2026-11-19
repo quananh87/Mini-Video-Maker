@@ -233,11 +233,21 @@ async function media(s){
   return plainImg(s);
  }
  if(src=='gpt')return gptImg(s);
- const f=src=='pexels'?pexels:pick;
- const u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');
- if(!u)throw new Error('Không tìm thấy video cho: '+s.k);
- return load(u);
+ const f=src=='pexels'?pexels:pick,nm=src=='pexels'?'Pexels':'Pixabay';
+ try{
+  let u;for(let a=0;a<2;a++)try{u=await f(s.k)||await f(s.k.split(' ')[0])||await f('technology');break}catch(e){if(a||!/Không kết nối/.test(e.message))throw e;await sleep(2000)}
+  if(!u)throw new Error('Không tìm thấy video cho: '+s.k);
+  return await load(u);
+ }catch(e){
+  if(!/Không kết nối|Không tải được/.test(e.message))throw e;
+  warn('Cảnh '+(s.i+1)+': '+nm+' không kết nối được từ trình duyệt này, đang dùng nguồn dự phòng.');
+  if(src!='pexels'&&$('xk').value.trim())try{return await media2('pexels',s)}catch(x){}
+  if($('uk').value.trim())try{return await unsplashImg(s)}catch(x){}
+  warn('Không có nguồn dự phòng, cảnh '+(s.i+1)+' dùng nền màu. Xem hướng dẫn kiểm tra '+nm+'.');
+  return plainImg(s);
+ }
 }
+async function media2(n,s){const u=await pexels(s.k)||await pexels('technology');if(!u)throw new Error('none');return load(u)}
 async function tts(text,ac){
  const j=await gem($('tm').value.trim(),{contents:[{parts:[{text:($('vs').value.trim()?$('vs').value.trim()+' ':'')+text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:$('vc').value}}}}});
  const bin=atob(j.candidates[0].content.parts[0].inlineData.data),n=bin.length>>1,buf=ac.createBuffer(1,n,24000),ch=buf.getChannelData(0);
